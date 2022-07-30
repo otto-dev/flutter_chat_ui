@@ -3,8 +3,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 
-import '../models/date_header.dart';
-import '../models/message_spacer.dart';
 import 'inherited_chat_theme.dart';
 import 'inherited_user.dart';
 
@@ -61,6 +59,7 @@ class ChatList extends StatefulWidget {
 /// [ChatList] widget state.
 class _ChatListState extends State<ChatList>
     with SingleTickerProviderStateMixin {
+  final Set<String> seenIds = {};
   late final Animation<double> _animation = CurvedAnimation(
     curve: Curves.easeOutQuad,
     parent: _controller,
@@ -76,6 +75,12 @@ class _ChatListState extends State<ChatList>
     super.initState();
 
     _scrollController = widget.scrollController ?? ScrollController();
+    for(final item in widget.items) {
+      if(item is Map<String, Object>) {
+        final message = item['message'] as types.Message;
+        seenIds.add(message.id);
+      }
+    }
     didUpdateWidget(widget);
   }
 
@@ -137,13 +142,19 @@ class _ChatListState extends State<ChatList>
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final item = widget.items[index];
+                    bool animate = false;
                     if (item is Map<String, Object>) {
-                      return AnimatedMessage(
-                        key: _valueKeyForItem(item),
-                        child: widget.itemBuilder(item, index),
-                      );
+                      final message = item['message'] as types.Message;
+                      if(!seenIds.contains(message.id)) {
+                        seenIds.add(message.id);
+                        animate = true;
+                      }
                     }
-                    return widget.itemBuilder(item, index);
+                    return AnimatedMessage(
+                      key: _valueKeyForItem(item),
+                      child: widget.itemBuilder(item, index),
+                      animate: animate,
+                    );
                   },
                   findChildIndexCallback: (Key key) {
                     if (key is ValueKey<Object>) {
@@ -241,9 +252,12 @@ class _ChatListState extends State<ChatList>
 }
 
 class AnimatedMessage extends StatefulWidget {
+  final bool animate; // just show the message without animation if set to false
+
   const AnimatedMessage({
     super.key,
     required this.child,
+    this.animate = true,
   });
 
   final Widget child;
@@ -271,7 +285,11 @@ class _AnimatedMessageState extends State<AnimatedMessage>
       curve: Curves.easeInQuad,
     );
 
-    _controller.forward();
+    if (widget.animate) {
+      _controller.forward();
+    } else {
+      _controller.value = 1;
+    }
   }
 
   @override
@@ -287,3 +305,4 @@ class _AnimatedMessageState extends State<AnimatedMessage>
         child: widget.child,
       );
 }
+
