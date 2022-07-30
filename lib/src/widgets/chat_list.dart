@@ -3,8 +3,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 
-import '../models/date_header.dart';
-import '../models/message_spacer.dart';
 import 'inherited_chat_theme.dart';
 import 'inherited_user.dart';
 
@@ -73,16 +71,11 @@ class _ChatListState extends State<ChatList>
       GlobalKey<SliverAnimatedListState>();
   late List<Object> _oldData = List.from(widget.items);
   late ScrollController _scrollController;
-  late ListModel<Object> _list;
 
   @override
   void initState() {
     super.initState();
-    _list = ListModel<Object>(
-      listKey: _listKey,
-      initialItems: widget.items,
-      removedItemBuilder: _removedMessageBuilder,
-    );
+
     _scrollController = widget.scrollController ?? ScrollController();
     didUpdateWidget(widget);
   }
@@ -141,26 +134,25 @@ class _ChatListState extends State<ChatList>
           slivers: [
             SliverPadding(
               padding: const EdgeInsets.only(bottom: 4),
-              sliver: SliverAnimatedList(
-                itemBuilder: (context, index, animation) {
-                  final item = _list._items[index];
-                  final key = _valueKeyValueForItem(item);
-                  return Container(
-                    key: ValueKey(key),
-                    child: widget.itemBuilder(item, index),
-                  );
-                },
-                key: _listKey,
-                findChildIndexCallback: (Key key) {
-                  if (key is ValueKey<Object>) {
-                    final index = _list._items.indexWhere((v) => _valueKeyValueForItem(v) == key.value);
-                    if(index > -1) {
-                      return index;
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                      (context, index) =>
+                      widget.itemBuilder(widget.items[index], index),
+                  findChildIndexCallback: (Key key) {
+                    if (key is ValueKey<Object>) {
+                      final newIndex = widget.items.indexWhere((v) {
+                        if (v is Map<String, Object>) {
+                          return v['message'] is types.Message && (v['message'] as types.Message).id == key.value;
+                        }
+                        return false;
+                      });
+                      print("new index: $newIndex");
+                      return newIndex;
                     }
-                  }
-                  return null;
-                },
-                initialItemCount: _list.length,
+                    return null;
+                  },
+                  childCount: widget.items.length,
+                ),
               ),
             ),
             SliverPadding(
@@ -215,18 +207,22 @@ class _ChatListState extends State<ChatList>
         }
       },
     );
-    for (final removal in diffResult.getUpdatesWithData()) {
-      if (removal is DataRemove) {
-        _list.removeAt(
-          (removal as DataRemove).position,
-        );
-      }
-    }
 
-    for (final insert in diffResult.getUpdatesWithData()) {
-      if (insert is DataInsert) {
-        _list.insert((insert as DataInsert).position, (insert as DataInsert).data);
-      }
+    for (final update in diffResult.getUpdates(batch: false)) {
+      update.when(
+        insert: (pos, count) {
+          _listKey.currentState?.insertItem(pos);
+        },
+        remove: (pos, count) {
+          final item = oldList[pos];
+          _listKey.currentState?.removeItem(
+            pos,
+            (_, animation) => _removedMessageBuilder(item, animation),
+          );
+        },
+        change: (pos, payload) {},
+        move: (from, to) {},
+      );
     }
 
     _scrollToBottomIfNeeded(oldList);
@@ -248,17 +244,15 @@ class _ChatListState extends State<ChatList>
     }
   }
 
-  Widget _removedMessageBuilder(BuildContext _, Object item, Animation<double> animation) =>
-      widget.itemBuilder(item, _oldData.indexOf(item));
-
-  // SizeTransition(
-  //   axisAlignment: -1,
-  //   sizeFactor: animation.drive(CurveTween(curve: Curves.easeInQuad)),
-  //   child: FadeTransition(
-  //     opacity: animation.drive(CurveTween(curve: Curves.easeInQuad)),
-  //     child: widget.itemBuilder(item, null),
-  //   ),
-  // );
+  Widget _removedMessageBuilder(Object item, Animation<double> animation) =>
+      SizeTransition(
+        axisAlignment: -1,
+        sizeFactor: animation.drive(CurveTween(curve: Curves.easeInQuad)),
+        child: FadeTransition(
+          opacity: animation.drive(CurveTween(curve: Curves.easeInQuad)),
+          child: widget.itemBuilder(item, null),
+        ),
+      );
 
   // Hacky solution to reconsider.
   void _scrollToBottomIfNeeded(List<Object> oldList) {
@@ -293,55 +287,4 @@ class _ChatListState extends State<ChatList>
       // Do nothing if there are no items.
     }
   }
-
-  Object _valueKeyValueForItem(Object item) {
-    if (item is Map<String, Object>) {
-      final message = item['message']! as types.Message;
-      return message.id;
-    } else if (item is MessageSpacer) {
-      return item.id;
-    } else if (item is DateHeader) {
-      return item.dateTime;
-    }
-    return item;
-  }
-}
-
-typedef RemovedItemBuilder<E> = Widget Function(BuildContext context, E item,  Animation<double> animation);
-
-class ListModel<E> {
-  ListModel({
-    required this.listKey,
-    required this.removedItemBuilder,
-    Iterable<E>? initialItems,
-  }) : _items = List<E>.from(initialItems ?? <E>[]);
-
-  final GlobalKey<SliverAnimatedListState> listKey;
-  final RemovedItemBuilder<E> removedItemBuilder;
-  final List<E> _items;
-
-  SliverAnimatedListState get _animatedList => listKey.currentState!;
-
-  void insert(int index, E item) {
-    _items.insert(index, item);
-    _animatedList.insertItem(index);
-  }
-
-  E removeAt(int index) {
-    final removedItem = _items.removeAt(index);
-    if (removedItem != null) {
-      _animatedList.removeItem(
-        index,
-            (BuildContext context, Animation<double> animation) =>
-            removedItemBuilder(context, removedItem, animation),
-      );
-    }
-    return removedItem;
-  }
-
-  int get length => _items.length;
-
-  E operator [](int index) => _items[index];
-
-  int indexOf(E item) => _items.indexOf(item);
 }
