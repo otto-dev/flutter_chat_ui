@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 
+import '../models/date_header.dart';
+import '../models/message_spacer.dart';
 import 'inherited_chat_theme.dart';
 import 'inherited_user.dart';
 
@@ -303,11 +305,11 @@ class _ChatListState extends State<ChatList>
       final message = item['message']! as types.Message;
       return ValueKey(message.id);
     }
-    // else if (item is MessageSpacer) {
-    //   return item.id;
-    // } else if (item is DateHeader) {
-    //   return item.dateTime;
-    // }
+    else if (item is MessageSpacer) {
+      return ValueKey("spacer ${item.id}");
+    } else if (item is DateHeader) {
+      return ValueKey(item.dateTime);
+    }
     return null;
   }
 }
