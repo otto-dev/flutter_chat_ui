@@ -69,9 +69,6 @@ class _ChatListState extends State<ChatList>
   late final AnimationController _controller = AnimationController(vsync: this);
 
   bool _isNextPageLoading = false;
-  final GlobalKey<SliverAnimatedListState> _listKey =
-      GlobalKey<SliverAnimatedListState>();
-  late List<Object> _oldData = List.from(widget.items);
   late ScrollController _scrollController;
 
   @override
@@ -86,7 +83,7 @@ class _ChatListState extends State<ChatList>
   void didUpdateWidget(covariant ChatList oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    _calculateDiffs(oldWidget.items);
+    _scrollToBottomIfNeeded(oldWidget.items);
   }
 
   @override
@@ -200,54 +197,6 @@ class _ChatListState extends State<ChatList>
         ),
       );
 
-  void _calculateDiffs(List<Object> oldList) async {
-    final diffResult = calculateListDiff<Object>(
-      oldList,
-      widget.items,
-      equalityChecker: (item1, item2) {
-        if (item1 is Map<String, Object> && item2 is Map<String, Object>) {
-          final message1 = item1['message']! as types.Message;
-          final message2 = item2['message']! as types.Message;
-
-          return message1.id == message2.id;
-        } else {
-          return item1 == item2;
-        }
-      },
-    );
-
-    for (final update in diffResult.getUpdates(batch: false)) {
-      update.when(
-        insert: (pos, count) {
-          _listKey.currentState?.insertItem(pos);
-        },
-        remove: (pos, count) {
-          final item = oldList[pos];
-          _listKey.currentState?.removeItem(
-            pos,
-            (_, animation) => _removedMessageBuilder(item, animation),
-          );
-        },
-        change: (pos, payload) {},
-        move: (from, to) {},
-      );
-    }
-
-    _scrollToBottomIfNeeded(oldList);
-
-    _oldData = List.from(widget.items);
-  }
-
-  Widget _removedMessageBuilder(Object item, Animation<double> animation) =>
-      SizeTransition(
-        axisAlignment: -1,
-        sizeFactor: animation.drive(CurveTween(curve: Curves.easeInQuad)),
-        child: FadeTransition(
-          opacity: animation.drive(CurveTween(curve: Curves.easeInQuad)),
-          child: widget.itemBuilder(item, null),
-        ),
-      );
-
   // Hacky solution to reconsider.
   void _scrollToBottomIfNeeded(List<Object> oldList) {
     try {
@@ -286,10 +235,6 @@ class _ChatListState extends State<ChatList>
     if (item is Map<String, Object>) {
       final message = item['message']! as types.Message;
       return ValueKey(message.id);
-    } else if (item is MessageSpacer) {
-      return ValueKey("spacer ${item.id}");
-    } else if (item is DateHeader) {
-      return ValueKey(item.dateTime);
     }
     return null;
   }
