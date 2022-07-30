@@ -140,10 +140,13 @@ class _ChatListState extends State<ChatList>
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final item = widget.items[index];
-                    return Container(
-                      key: _valueKeyForItem(item),
-                      child: widget.itemBuilder(item, index),
-                    );
+                    if (item is Map<String, Object>) {
+                      return AnimatedMessage(
+                        key: _valueKeyForItem(item),
+                        child: widget.itemBuilder(item, index),
+                      );
+                    }
+                    return widget.itemBuilder(item, index);
                   },
                   findChildIndexCallback: (Key key) {
                     if (key is ValueKey<Object>) {
@@ -235,20 +238,6 @@ class _ChatListState extends State<ChatList>
     _oldData = List.from(widget.items);
   }
 
-  Widget _newMessageBuilder(int index) {
-    try {
-      final item = _oldData[index];
-      final key = _valueKeyForItem(item);
-      return Container(
-        key: key,
-        // duration: Duration(milliseconds: 300),
-        child: widget.itemBuilder(item, index),
-      );
-    } catch (e) {
-      return const SizedBox();
-    }
-  }
-
   Widget _removedMessageBuilder(Object item, Animation<double> animation) =>
       SizeTransition(
         axisAlignment: -1,
@@ -297,12 +286,59 @@ class _ChatListState extends State<ChatList>
     if (item is Map<String, Object>) {
       final message = item['message']! as types.Message;
       return ValueKey(message.id);
-    }
-    else if (item is MessageSpacer) {
+    } else if (item is MessageSpacer) {
       return ValueKey("spacer ${item.id}");
     } else if (item is DateHeader) {
       return ValueKey(item.dateTime);
     }
     return null;
   }
+}
+
+class AnimatedMessage extends StatefulWidget {
+  const AnimatedMessage({
+    super.key,
+    required this.child,
+  });
+
+  final Widget child;
+
+  @override
+  _AnimatedMessageState createState() => _AnimatedMessageState();
+}
+
+class _AnimatedMessageState extends State<AnimatedMessage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInQuad,
+    );
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SizeTransition(
+        axisAlignment: 1,
+        sizeFactor: _animation,
+        child: widget.child,
+      );
 }
