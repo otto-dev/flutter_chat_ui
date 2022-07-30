@@ -140,16 +140,9 @@ class _ChatListState extends State<ChatList>
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final item = widget.items[index];
-                    // if (item is Map<String, Object>) {
-                    //   final message = item['message']! as types.Message;
-                    //   return Container(
-                    //     key: _valueKeyForItem(item),
-                    //     child: widget.itemBuilder(widget.items[index], index),
-                    //   );
-                    // }
                     return Container(
                       key: _valueKeyForItem(item),
-                      child: widget.itemBuilder(widget.items[index], index),
+                      child: widget.itemBuilder(item, index),
                     );
                   },
                   findChildIndexCallback: (Key key) {
