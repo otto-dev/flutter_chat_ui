@@ -134,11 +134,25 @@ class _ChatListState extends State<ChatList>
           slivers: [
             SliverPadding(
               padding: const EdgeInsets.only(bottom: 4),
-              sliver: SliverAnimatedList(
-                initialItemCount: widget.items.length,
-                key: _listKey,
-                itemBuilder: (_, index, animation) =>
-                    _newMessageBuilder(index, animation),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                      (context, index) =>
+                      widget.itemBuilder(widget.items[index], index),
+                  findChildIndexCallback: (Key key) {
+                    if (key is ValueKey<Object>) {
+                      final newIndex = widget.items.indexWhere((v) {
+                        if (v is Map<String, Object>) {
+                          return v['message'] is types.Message && (v['message'] as types.Message).id == key.value;
+                        }
+                        return false;
+                      });
+                      print("new index: $newIndex");
+                      return newIndex;
+                    }
+                    return null;
+                  },
+                  childCount: widget.items.length,
+                ),
               ),
             ),
             SliverPadding(
