@@ -136,18 +136,25 @@ class _ChatListState extends State<ChatList>
               padding: const EdgeInsets.only(bottom: 4),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                      (context, index) =>
-                      widget.itemBuilder(widget.items[index], index),
+                  (context, index) {
+                    final item = widget.items[index];
+                    if (item is Map<String, Object>) {
+                      final message = item['message']! as types.Message;
+                      return Container(
+                        key: ValueKey(message.id),
+                        child: widget.itemBuilder(widget.items[index], index),
+                      );
+                    }
+                    return widget.itemBuilder(widget.items[index], index);
+                  },
                   findChildIndexCallback: (Key key) {
                     if (key is ValueKey<Object>) {
-                      final newIndex = widget.items.indexWhere((v) {
-                        if (v is Map<String, Object>) {
-                          return v['message'] is types.Message && (v['message'] as types.Message).id == key.value;
-                        }
-                        return false;
-                      });
-                      print("new index: $newIndex");
-                      return newIndex;
+                      final newIndex = widget.items.indexWhere(
+                        (v) => _valueKeyValueForItem(v) == key.value,
+                      );
+                      if (newIndex != -1) {
+                        return newIndex;
+                      }
                     }
                     return null;
                   },
@@ -230,13 +237,15 @@ class _ChatListState extends State<ChatList>
     _oldData = List.from(widget.items);
   }
 
-  Widget _newMessageBuilder(int index, Animation<double> animation) {
+  Widget _newMessageBuilder(int index) {
     try {
       final item = _oldData[index];
-
-      return SizeTransition(
-        axisAlignment: -1,
-        sizeFactor: animation.drive(CurveTween(curve: Curves.easeOutQuad)),
+      final key = _valueKeyValueForItem(item) != null
+          ? ValueKey(_valueKeyValueForItem(item))
+          : null;
+      return Container(
+        key: key,
+        // duration: Duration(milliseconds: 300),
         child: widget.itemBuilder(item, index),
       );
     } catch (e) {
@@ -286,5 +295,18 @@ class _ChatListState extends State<ChatList>
     } catch (e) {
       // Do nothing if there are no items.
     }
+  }
+
+  Object? _valueKeyValueForItem(Object item) {
+    if (item is Map<String, Object>) {
+      final message = item['message']! as types.Message;
+      return message.id;
+    }
+    // else if (item is MessageSpacer) {
+    //   return item.id;
+    // } else if (item is DateHeader) {
+    //   return item.dateTime;
+    // }
+    return null;
   }
 }
