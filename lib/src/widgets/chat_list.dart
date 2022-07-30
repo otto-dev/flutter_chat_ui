@@ -138,19 +138,22 @@ class _ChatListState extends State<ChatList>
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final item = widget.items[index];
-                    if (item is Map<String, Object>) {
-                      final message = item['message']! as types.Message;
-                      return Container(
-                        key: ValueKey(message.id),
-                        child: widget.itemBuilder(widget.items[index], index),
-                      );
-                    }
-                    return widget.itemBuilder(widget.items[index], index);
+                    // if (item is Map<String, Object>) {
+                    //   final message = item['message']! as types.Message;
+                    //   return Container(
+                    //     key: _valueKeyForItem(item),
+                    //     child: widget.itemBuilder(widget.items[index], index),
+                    //   );
+                    // }
+                    return Container(
+                      key: _valueKeyForItem(item),
+                      child: widget.itemBuilder(widget.items[index], index),
+                    );
                   },
                   findChildIndexCallback: (Key key) {
                     if (key is ValueKey<Object>) {
                       final newIndex = widget.items.indexWhere(
-                        (v) => _valueKeyValueForItem(v) == key.value,
+                        (v) => _valueKeyForItem(v) == key,
                       );
                       if (newIndex != -1) {
                         return newIndex;
@@ -240,9 +243,7 @@ class _ChatListState extends State<ChatList>
   Widget _newMessageBuilder(int index) {
     try {
       final item = _oldData[index];
-      final key = _valueKeyValueForItem(item) != null
-          ? ValueKey(_valueKeyValueForItem(item))
-          : null;
+      final key = _valueKeyForItem(item);
       return Container(
         key: key,
         // duration: Duration(milliseconds: 300),
@@ -297,10 +298,10 @@ class _ChatListState extends State<ChatList>
     }
   }
 
-  Object? _valueKeyValueForItem(Object item) {
+  Key? _valueKeyForItem(Object item) {
     if (item is Map<String, Object>) {
       final message = item['message']! as types.Message;
-      return message.id;
+      return ValueKey(message.id);
     }
     // else if (item is MessageSpacer) {
     //   return item.id;
