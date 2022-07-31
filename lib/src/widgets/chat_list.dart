@@ -75,11 +75,10 @@ class _ChatListState extends State<ChatList>
     super.initState();
 
     _scrollController = widget.scrollController ?? ScrollController();
-    for(final item in widget.items) {
-      if(item is Map<String, Object>) {
-        final message = item['message'] as types.Message;
+    for (final item in widget.items) {
+      _mapMessage(item, (message) {
         seenIds.add(message.id);
-      }
+      });
     }
     didUpdateWidget(widget);
   }
@@ -142,14 +141,11 @@ class _ChatListState extends State<ChatList>
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final item = widget.items[index];
-                    bool animate = false;
-                    if (item is Map<String, Object>) {
-                      final message = item['message'] as types.Message;
-                      if(!seenIds.contains(message.id)) {
-                        seenIds.add(message.id);
-                        animate = true;
-                      }
-                    }
+                    final animate = _mapMessage(
+                          item,
+                          (message) => seenIds.add(message.id), // returns true if item not yet in the set
+                        ) ??
+                        false;
                     return AnimatedMessage(
                       key: _valueKeyForItem(item),
                       child: widget.itemBuilder(item, index),
@@ -214,38 +210,39 @@ class _ChatListState extends State<ChatList>
       // Take index 1 because there is always a spacer on index 0.
       final oldItem = oldList[1];
       final item = widget.items[1];
-
-      if (oldItem is Map<String, Object> && item is Map<String, Object>) {
-        final oldMessage = oldItem['message']! as types.Message;
-        final message = item['message']! as types.Message;
-
-        // Compare items to fire only on newly added messages.
-        if (oldMessage != message) {
-          // Run only for sent message.
-          if (message.author.id == InheritedUser.of(context).user.id) {
-            // Delay to give some time for Flutter to calculate new
-            // size after new message was added
-            Future.delayed(const Duration(milliseconds: 100), () {
-              if (_scrollController.hasClients) {
-                _scrollController.animateTo(
-                  0,
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeInQuad,
-                );
-              }
-            });
+      _mapMessage(
+        oldItem,
+        (oldMessage) => _mapMessage(item, (message) {
+          // Compare items to fire only on newly added messages.
+          if (oldMessage != message) {
+            // Run only for sent message.
+            if (message.author.id == InheritedUser.of(context).user.id) {
+              // Delay to give some time for Flutter to calculate new
+              // size after new message was added
+              Future.delayed(const Duration(milliseconds: 100), () {
+                if (_scrollController.hasClients) {
+                  _scrollController.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInQuad,
+                  );
+                }
+              });
+            }
           }
-        }
-      }
+        }),
+      );
     } catch (e) {
       // Do nothing if there are no items.
     }
   }
 
-  Key? _valueKeyForItem(Object item) {
-    if (item is Map<String, Object>) {
-      final message = item['message']! as types.Message;
-      return ValueKey(message.id);
+  Key? _valueKeyForItem(Object item) =>
+      _mapMessage(item, (message) => ValueKey(message.id));
+
+  T? _mapMessage<T>(Object maybeMessage, T Function(types.Message) f) {
+    if (maybeMessage is Map<String, Object>) {
+      return f(maybeMessage['message'] as types.Message);
     }
     return null;
   }
@@ -282,7 +279,7 @@ class _AnimatedMessageState extends State<AnimatedMessage>
 
     _animation = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeInQuad,
+      curve: Curves.easeOutQuad,
     );
 
     if (widget.animate) {
@@ -300,9 +297,8 @@ class _AnimatedMessageState extends State<AnimatedMessage>
 
   @override
   Widget build(BuildContext context) => SizeTransition(
-        axisAlignment: 1,
+        axisAlignment: -1,
         sizeFactor: _animation,
         child: widget.child,
       );
 }
-
